@@ -24,8 +24,9 @@ public class SecurityServiceImpl implements SecurityService {
 
     @Override
     public User findLoggedInUser() {
-        Object userDetails = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        if (userDetails instanceof UserDetails) {
+        Object userDetails = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        System.out.println(((UserDetails) userDetails).getUsername());
+        if (userDetails instanceof org.springframework.security.core.userdetails.User) {
             return userRepository.findByUsername(((UserDetails) userDetails).getUsername()).orElse(null);
         }
 

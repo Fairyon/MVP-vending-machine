@@ -1,6 +1,7 @@
 package com.example.vendingmachine.controller;
 
 import com.example.vendingmachine.model.TradeReturnData;
+import com.example.vendingmachine.model.TradingProductData;
 import com.example.vendingmachine.model.entity.Coin;
 import com.example.vendingmachine.model.entity.Product;
 import com.example.vendingmachine.model.entity.User;
@@ -13,7 +14,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
 import java.util.ArrayList;
@@ -21,6 +24,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
 
+@RestController
 public class TradeController {
 
     @Autowired
@@ -37,58 +41,59 @@ public class TradeController {
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/deposit")
-    public ResponseEntity<?> deposit(@Valid Coin coin) {
+    public ResponseEntity<?> deposit(@Valid @RequestBody Coin coin) {
         User user = securityService.findLoggedInUser();
 
         if(user == null)
             return new ResponseEntity<Object>("User does not exist.", HttpStatus.UNAUTHORIZED);
-        if(user.getRole() != "buyer")
+        if(! user.getRole().equals("buyer"))
             return new ResponseEntity<Object>("User is not a buyer.", HttpStatus.UNAUTHORIZED);
 
         if(! IntStream.of(coin.POSSIBLE_VALUES).anyMatch(x -> x == coin.getValue()))
             return new ResponseEntity<Object>("Wrong coin value.", HttpStatus.NOT_ACCEPTABLE);
 
-        final boolean[] coinFound = { false };
+        boolean coinFound = false;
 
-        Coin machineCoine = coinService.findByValue(coin.getValue());
-        if(machineCoine != null){
-            machineCoine.incrementAmountByOne();
-            coinFound[0] = true;
+        Coin machineCoin = coinService.findByValue(coin.getValue());
+        if(machineCoin != null){
+            machineCoin.setAmount(machineCoin.getAmount() + coin.getAmount());
+            coinFound = true;
         }
 
-        if (!coinFound[0]) {
+        if (!coinFound) {
             coinService.saveCoin(coin);
-            coinFound[0] = true;
+            coinFound = true;
         }
 
-        if (coinFound[0]) {
-            user.currentAmount += coin.getValue();
+        if (coinFound) {
+            user.currentAmount += coin.getValue() * coin.getAmount();
         }
 
         // update money
         this.userService.updateUser(user);
 
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok("New amount: " + user.currentAmount);
     }
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/buy")
-    public ResponseEntity<?> buy(Long productId, Integer amountOfProducts) {
+    public ResponseEntity<?> buy(@Valid @RequestBody TradingProductData input) {
         User user = securityService.findLoggedInUser();
 
         if (user == null)
             return new ResponseEntity<Object>("User does not exist.", HttpStatus.UNAUTHORIZED);
-        if (user.getRole() != "buyer")
+        if(! user.getRole().equals("buyer"))
             return new ResponseEntity<Object>("User is not a buyer.", HttpStatus.UNAUTHORIZED);
 
-        Product product = productService.findById(productId);
+        Product product = productService.findById(input.productId);
+
         if(product == null)
             return new ResponseEntity<Object>("Product does not exist.", HttpStatus.NOT_FOUND);
 
         if(product.getCost() > user.currentAmount)
             return new ResponseEntity<Object>("Not enough money.", HttpStatus.NOT_ACCEPTABLE);
 
-        Integer totalAmount = product.getCost() * amountOfProducts;
+        Integer totalAmount = product.getCost() * input.amount;
 
         if(totalAmount > user.currentAmount){
             Integer possibleToBuy = (int) (user.currentAmount / product.getCost());
@@ -113,18 +118,26 @@ public class TradeController {
         TradeReturnData result = new TradeReturnData();
 
         result.total = totalAmount;
-        result.productId = productId;
-        result.boughtProductsAmount = amountOfProducts;
+        result.productId = input.productId;
+        result.boughtProductsAmount = input.amount;
         result.change = change;
 
-        product.setAmountAvailable(product.getAmountAvailable() - amountOfProducts);
-        productService.saveProduct(product);
+        product.setAmountAvailable(product.getAmountAvailable() - input.amount);
+        if(product.getAmountAvailable() > 0)
+            productService.saveProduct(product);
+        else
+            productService.deleteProduct(product.getId());
+
         change.forEach(coin -> {
             Coin storedCoin = coinService.findByValue(coin.getValue());
             storedCoin.setAmount(storedCoin.getAmount() - coin.getAmount());
             coinService.saveCoin(storedCoin);
         });
-        user.currentAmount -= totalAmount;
+
+        user.currentAmount = 0;
+
+        // update money
+        this.userService.updateUser(user);
 
         return ResponseEntity.ok(result);
     }
@@ -140,7 +153,7 @@ public class TradeController {
 
         if (user == null)
             return new ResponseEntity<Object>("User does not exist.", HttpStatus.UNAUTHORIZED);
-        if (user.getRole() != "buyer")
+        if(! user.getRole().equals("buyer"))
             return new ResponseEntity<Object>("User is not a buyer.", HttpStatus.UNAUTHORIZED);
 
         final int[] restAmount = {0};
@@ -151,6 +164,9 @@ public class TradeController {
         }
 
         user.currentAmount -= restAmount[0];
+
+        // update money
+        this.userService.updateUser(user);
 
         return ResponseEntity.ok(change);
     }

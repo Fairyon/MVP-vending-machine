@@ -1,5 +1,7 @@
 package com.example.vendingmachine.model;
 
+import org.springframework.context.annotation.Bean;
+
 import javax.validation.constraints.NotBlank;
 
 public class SignUpData {

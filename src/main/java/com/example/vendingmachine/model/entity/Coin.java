@@ -24,7 +24,7 @@ public class Coin {
     private Integer value;
 
     @Column(name = "amount")
-    private Integer amount;
+    private Integer amount = 0;
 
     public Coin(Integer value, Integer amount) {
         this.value = value;
@@ -47,11 +47,7 @@ public class Coin {
         return amount;
     }
 
-    public void incrementAmountByOne() {
-        amount++;
-    }
-
-    public void setAmount(Integer amoun) {
+    public void setAmount(Integer amount) {
         this.amount = amount;
     }
 }

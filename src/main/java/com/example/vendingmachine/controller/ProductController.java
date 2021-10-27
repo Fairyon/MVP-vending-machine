@@ -39,11 +39,11 @@ public class ProductController {
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping
-    public ResponseEntity<?> addProduct(@Valid Product product) {
+    public ResponseEntity<?> addProduct(@Valid @RequestBody Product product) {
         User user = securityService.findLoggedInUser();
         if(user == null)
             return new ResponseEntity<Object>("User does not exist.", HttpStatus.UNAUTHORIZED);
-        if(user.getRole() != "seller")
+        if(! user.getRole().equals("seller"))
             return new ResponseEntity<Object>("User is not a seller.", HttpStatus.UNAUTHORIZED);
 
         product.setSeller(user);
@@ -57,7 +57,7 @@ public class ProductController {
         User user = securityService.findLoggedInUser();
         if(user == null)
             return new ResponseEntity<Object>("User does not exist.", HttpStatus.UNAUTHORIZED);
-        if(user.getRole() != "seller")
+        if(! user.getRole().equals("seller"))
             return new ResponseEntity<Object>("User is not a seller.", HttpStatus.UNAUTHORIZED);
 
         Product oldProduct = productService.findById(productId);
@@ -78,7 +78,7 @@ public class ProductController {
         User user = securityService.findLoggedInUser();
         if(user == null)
             return new ResponseEntity<Object>("User does not exist.", HttpStatus.UNAUTHORIZED);
-        if(user.getRole() != "seller")
+        if(! user.getRole().equals("seller"))
             return new ResponseEntity<Object>("User is not a seller.", HttpStatus.UNAUTHORIZED);
 
         Product product = productService.findById(productId);
